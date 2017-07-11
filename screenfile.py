@@ -69,12 +69,11 @@ SPRITE_TABLE = [
 
 tiles = imageto2bit(args.tile_image)
 tiled_json = json.loads(args.tilemap.read())
-print(tiled_json)
 bgmap = bytes(tiled_json['layers'][0]['data'])
 fgmap = bytes(tiled_json['layers'][1]['data'])
 sprite_table = bytes(SPRITE_TABLE)
 
-assert len(tiles) == 128*8*8*2//4
+assert len(tiles) == (256 // 8) * (256 * 2)
 assert len(bgmap) == 1024   
 assert len(fgmap) == 1024
 assert len(SPRITE_TABLE) == 40*4
@@ -83,3 +82,6 @@ args.outfile.write(tiles)
 args.outfile.write(bgmap)
 args.outfile.write(fgmap)
 args.outfile.write(sprite_table)
+
+args.outfile.close()
+print('wrote output to {}'.format(args.outfile.name))
