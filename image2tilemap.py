@@ -30,8 +30,8 @@ def rgb_i2bit(iterable):
             lo = 0
             for i in range(8):
                 c = next(iterable) // 64
-                hi |= (c >> 1) << i
-                lo |= (c & 1) << i
+                hi |= (c >> 1) << (7 - i)
+                lo |= (c & 1) << (7 - i)
             yield hi
             yield lo
     except StopIteration:
