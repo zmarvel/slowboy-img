@@ -113,9 +113,12 @@ height_tiles = height // tile_height
 bgtiles = []
 fgtiles = []
 
-for row in range(height_tiles):
-    slice = map(lambda s: '{:2x}'.format(s), tile_data[2*row*width_tiles:(2*row+1)*width_tiles])
-    print(' '.join(slice))
+for row in range(256*2):
+    print(' '.join(map(lambda s: '{:#04x}'.format(s), tile_data[row:row+(256//8)])))
+
+encoded_tiles = [[] for _ in range(width_tiles*height_tiles)]
+for row in range(height*(width/tile_width)):
+
 
 encoded_tiles = [bytearray(16) for _ in range(width_tiles*height_tiles)]
 for i in range(width_tiles*height_tiles):
@@ -129,8 +132,6 @@ for i in range(width_tiles*height_tiles):
         #print(brow*width_tiles + bcol, (brow+1)*width_tiles + bcol)
         #input()
         idx = brow % 16
-        print(idx, brow)
-        input()
         encoded_tiles[i][idx] = hi
         encoded_tiles[i][idx+1] = lo
 
