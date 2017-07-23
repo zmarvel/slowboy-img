@@ -34,26 +34,31 @@ def main():
     with open(sys.argv[1], 'rb') as f:
         tmap = f.read()
 
+
     tilecolors = list(i2bitdecode(tmap, palette))
-    width = int(sqrt(len(tilecolors)))
-    height = width
-    width = 256
-    height = 128
+    width = 128
+    height = 48
     print(width, height)
+
+
+    tiles = []
+    width_tiles = width // 8
+    height_tiles = height // 8
+    for i in range(width_tiles*height_tiles):
+        tile = tmap[i*16:(i+1)*16]
+        tiles.append(list(i2bitdecode(tile, palette)))
 
     window = sdl2.ext.Window('display2bit', (width, height))
     window.show()
     renderer = sdl2.ext.Renderer(window)
-    for i, c in enumerate(tilecolors):
-        #x = i % 256
-        #x = i & 0xff
-        x = i % width
-        y = i // width
-        renderer.draw_point((x, y), color=c)
-        x += 1
-        if x >= width:
-            x = 0
-            y += 1
+
+    for tid, tile in enumerate(tiles):
+        tx = tid % width_tiles
+        ty = tid // width_tiles
+        for i, c in enumerate(tile):
+            x = tx*8 + (i % 8)
+            y = ty*8 + (i // 8)
+            renderer.draw_point((x, y), color=c)
 
     renderer.present()
 
