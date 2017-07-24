@@ -3,7 +3,7 @@
 import itertools as it
 from PIL import Image
 
-def rgb_iaverage(iterable):
+def rgba_iaverage(iterable):
     """Takes an iterable, which will be consumed in groups of 3 (so the iterable
     should have a length divisible by 3). This function is a generator of the
     average of these RGB values.
@@ -39,8 +39,34 @@ def rgb_i2bit(iterable):
 
 def imageto2bit(filename):
     img = Image.open(filename)
+    width = img.width
+    height = img.height
+    print(width, height)
+    width_tiles = width // 8
+    height_tiles = height // 8
     img_bytes = img.tobytes()
-    return bytes(rgb_i2bit(rgb_iaverage(img_bytes)))
+    if img.mode == 'RGBA':
+        img_bytes = bytes(rgba_iaverage(img_rgba_bytes))
+    assert len(img_bytes) == width_tiles*height_tiles*8*8
+    tiles = []
+    for i in range(width_tiles*height_tiles):
+        tile = []
+        tx = (i % width_tiles) * 8
+        ty = (i // width_tiles) * 8
+        for j in range(8):
+            y = ty + j
+            print(y*width+tx, y*width+tx+8)
+            row = img_bytes[y*width+tx:y*width+tx+8]
+            print(len(row))
+            tile.extend(row)
+        tiles.append(tile)
+
+    encoded = []
+    for tile in tiles:
+        assert len(tile) == 8*8
+        encoded.extend(rgb_i2bit(tile))
+
+    return encoded
 
 if __name__ == '__main__':
     import argparse
@@ -58,7 +84,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     try:
-        rgb2_bytes = imageto2bit(args.in_file)
+        rgb2_bytes = bytes(imageto2bit(args.in_file))
     except IOError:
         parser.print_help()
         sys.exit()
