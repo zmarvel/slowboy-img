@@ -1,17 +1,16 @@
 
 import sys
-from collections import defaultdict
-from math import sqrt
 import sdl2.ext
 from sdl2.ext import Color
 import sdl2.events
 
 palette = [
-        Color(0, 0, 0, 255),
-        Color(64, 64, 64, 255),
-        Color(192, 192, 192, 255),
         Color(255, 255, 255, 255),
+        Color(192, 192, 192, 255),
+        Color(64, 64, 64, 255),
+        Color(0, 0, 0, 255),
         ]
+
 
 def i2bitdecode(iterator, palette):
     iterator = iter(iterator)
@@ -27,6 +26,7 @@ def i2bitdecode(iterator, palette):
     except StopIteration:
         raise StopIteration()
 
+
 def main():
     if len(sys.argv) < 2:
         sys.exit('USAGE: {} <tilemap>')
@@ -34,12 +34,9 @@ def main():
     with open(sys.argv[1], 'rb') as f:
         tmap = f.read()
 
-
-    tilecolors = list(i2bitdecode(tmap, palette))
     width = 128
     height = 48
     print(width, height)
-
 
     tiles = []
     width_tiles = width // 8
@@ -70,6 +67,7 @@ def main():
                 running = False
                 break
         sdl2.SDL_Delay(100)
+
 
 if __name__ == '__main__':
     main()
