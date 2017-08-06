@@ -18,6 +18,8 @@ import sdl2.ext
 from sdl2.ext import Color
 import sdl2.events
 
+from display2bit import i2bitdecode, split_tiles
+
 bgpalette = [
     Color(0, 0, 0, 255),
     Color(64, 64, 64, 255),
@@ -44,19 +46,6 @@ SPRITE_WIDTH = 8
 SPRITE_HEIGHT = 8
 #SPRITE_HEIGHT = 16
 
-def i2bitdecode(iterator, palette):
-    iterator = iter(iterator)
-    try:
-        while True:
-            hi = next(iterator)
-            lo = next(iterator)
-            for i in range(8):
-                c = (lo >> (7-i)) & 1
-                c |= ((hi >> (7-i)) & 1) << 1
-                color = palette[c]
-                yield color
-    except StopIteration:
-        raise StopIteration()
 
 def test_i2bitdecode():
     encoded = [
@@ -78,6 +67,9 @@ def test_i2bitdecode():
     ]
     assert decoded == decoded_expected
 
+
+test_i2bitdecode()
+
 parser = argparse.ArgumentParser(description='Display a static GB screen')
 parser.add_argument('screenfile', type=argparse.FileType('rb'),
                     help='Binary file format described in the script.')
@@ -92,8 +84,6 @@ parser.add_argument('--wcy', type=int,
 
 args = parser.parse_args()
 
-test_i2bitdecode()
-
 tile_data = args.screenfile.read(0x4000)
 bg_tmap = args.screenfile.read(0x400)
 fg_tmap = args.screenfile.read(0x400)
@@ -104,58 +94,6 @@ assert len(bg_tmap) == 32*32
 assert len(fg_tmap) == 32*32
 assert len(sprite_table) == 40*4
 
-width = 256
-height = 256
-tile_width = 8
-tile_height = 8
-width_tiles = width // tile_width
-height_tiles = height // tile_height
-bgtiles = []
-fgtiles = []
-
-for row in range(256*2):
-    print(' '.join(map(lambda s: '{:#04x}'.format(s), tile_data[row:row+(256//8)])))
-
-encoded_tiles = [[] for _ in range(width_tiles*height_tiles)]
-for row in range(height*(width/tile_width)):
-
-
-encoded_tiles = [bytearray(16) for _ in range(width_tiles*height_tiles)]
-for i in range(width_tiles*height_tiles):
-    trow = i // width_tiles
-    tcol = i % width_tiles
-    for trowoff in range(8):
-        brow = (trow+trowoff) * 2
-        bcol = tcol
-        hi = tile_data[brow*width_tiles + bcol]
-        lo = tile_data[(brow+1)*width_tiles + bcol]
-        #print(brow*width_tiles + bcol, (brow+1)*width_tiles + bcol)
-        #input()
-        idx = brow % 16
-        encoded_tiles[i][idx] = hi
-        encoded_tiles[i][idx+1] = lo
-
-for encoded in encoded_tiles:
-    bgtile = list(i2bitdecode(encoded, bgpalette))
-    fgtile = list(i2bitdecode(encoded, fgpalette))
-    assert len(bgtile) == 8*8
-    assert len(fgtile) == 8*8
-    bgtiles.append(bgtile)
-    fgtiles.append(fgtile)
-
-
-#for i in range(0, 256):
-#    tx = i % width_tiles
-#    ty = i // width_tiles
-#    off = 16*i
-#    encoded = tile_data[off:off+16]
-#    bgtile = list(i2bitdecode(encoded, bgpalette))
-#    fgtile = list(i2bitdecode(encoded, fgpalette))
-#    assert len(bgtile) == 8*8
-#    assert len(fgtile) == 8*8
-#    bgtiles.append(bgtile)
-#    fgtiles.append(fgtile)
-
 window = sdl2.ext.Window('GB screen', (BACKGROUND_WIDTH, BACKGROUND_HEIGHT))
 window.show()
 renderer = sdl2.ext.Renderer(window)
@@ -163,10 +101,15 @@ width = SCREEN_WIDTH
 height = SCREEN_HEIGHT
 tile_width = 8
 tile_height = 8
+tile_size = tile_width, tile_height
 width_tiles = width // tile_width
 height_tiles = height // tile_height
 bgwidth_tiles = BACKGROUND_WIDTH // tile_width
 bgheight_tiles = BACKGROUND_HEIGHT // tile_height
+
+
+bgtiles = split_tiles(tile_data, (256, 256), (tile_size))
+
 
 def draw_tile(renderer, tile, point):
     x, y = point

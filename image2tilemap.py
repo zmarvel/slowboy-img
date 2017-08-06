@@ -22,8 +22,10 @@ def rgb_i2bit(iterable):
         raise StopIteration
 
 
-def imageto2bit(filename, tile_size):
-    img = Image.open(filename).convert(mode='L')
+def imageto2bit(img, tile_size):
+    """Convert a (grayscale) PIL Image to 2-bit
+    """
+    #img = Image.open(filename).convert(mode='L')
     width, height = img.size
     twidth, theight = tile_size
     width_tiles = width // twidth
@@ -46,7 +48,7 @@ def imageto2bit(filename, tile_size):
         assert len(tile) == twidth*theight
         encoded.extend(rgb_i2bit(tile))
 
-    return encoded
+    return bytes(encoded)
 
 
 if __name__ == '__main__':
@@ -66,7 +68,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     try:
-        rgb2_bytes = bytes(imageto2bit(args.in_file, (8, 8)))
+        img = Image.open(args.in_file).convert('L')
+        rgb2_bytes = bytes(imageto2bit(img, (8, 8)))
     except IOError:
         parser.print_help()
         sys.exit()

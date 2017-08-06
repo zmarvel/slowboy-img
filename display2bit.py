@@ -27,6 +27,19 @@ def i2bitdecode(iterator, palette):
         raise StopIteration()
 
 
+def split_tiles(tileset, size, tile_size):
+    width, height = size
+    twidth, theight = tile_size
+    tile_size_bytes = 16
+    tiles = []
+    width_tiles = width // twidth
+    height_tiles = height // theight
+    for i in range(width_tiles*height_tiles):
+        tile = tileset[i*tile_size_bytes:(i+1)*tile_size_bytes]
+        tiles.append(list(i2bitdecode(tile, palette)))
+    return tiles
+
+
 def main():
     if len(sys.argv) < 2:
         sys.exit('USAGE: {} <tilemap>')
@@ -34,16 +47,9 @@ def main():
     with open(sys.argv[1], 'rb') as f:
         tmap = f.read()
 
-    width = 128
-    height = 48
-    print(width, height)
-
-    tiles = []
-    width_tiles = width // 8
-    height_tiles = height // 8
-    for i in range(width_tiles*height_tiles):
-        tile = tmap[i*16:(i+1)*16]
-        tiles.append(list(i2bitdecode(tile, palette)))
+    twidth = 8
+    theight = 8
+    tiles = split_tiles(tmap, (255, 255), (8, 8))
 
     window = sdl2.ext.Window('display2bit', (width, height))
     window.show()

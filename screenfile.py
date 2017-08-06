@@ -3,13 +3,14 @@
 One-off script for building an input file to displayscreen.py."""
 
 import argparse
+from PIL import Image
 from image2tilemap import imageto2bit
 import json
 import sys
 
 parser = argparse.ArgumentParser(description='One-off script for building an input file to displayscreen.py')
 parser.add_argument('tile_image', type=str,
-        help='128x128 image containing 8x8 tiles')
+        help='256x256 image containing 8x8 tiles')
 parser.add_argument('tilemap', type=argparse.FileType('r'),
         help='Tiled JSON containing the BG and FG maps (layers 0 and 1)')
 parser.add_argument('outfile', type=argparse.FileType('wb'),
@@ -66,15 +67,16 @@ SPRITE_TABLE = [
         0, 0, 0, 0,
         0, 0, 0, 0,
         ]
-
-tiles = imageto2bit(args.tile_image)
+img = Image.open(args.tile_image).convert(mode='L')
+tiles = imageto2bit(img, (8, 8))
 tiled_json = json.loads(args.tilemap.read())
-bgmap = bytes(tiled_json['layers'][0]['data'])
-fgmap = bytes(tiled_json['layers'][1]['data'])
+sub1 = lambda x: x - 1 if x > 0 else 0
+bgmap = bytes(map(sub1, tiled_json['layers'][0]['data']))
+fgmap = bytes(map(sub1, tiled_json['layers'][1]['data']))
 sprite_table = bytes(SPRITE_TABLE)
 
 assert len(tiles) == (256 // 8) * (256 * 2)
-assert len(bgmap) == 1024   
+assert len(bgmap) == 1024
 assert len(fgmap) == 1024
 assert len(SPRITE_TABLE) == 40*4
 
