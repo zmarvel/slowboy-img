@@ -1,5 +1,7 @@
 from typing import List, Iterable, Sequence
 
+from sdl2.ext import Color
+
 
 def encode_rgb(iterable: Iterable[int], palette: Sequence[int]) \
         -> Iterable[int]:
@@ -17,7 +19,9 @@ def encode_rgb(iterable: Iterable[int], palette: Sequence[int]) \
             lo = 0
             for i in range(8):
                 # c = (next(iterable) >> 6) ^ 0x3
-                c = palette.index(next(iterable))
+                b = next(iterable)
+                #print(hex(b))
+                c = palette.index(b)
                 hi |= (c >> 1) << (7 - i)
                 lo |= (c & 1) << (7 - i)
             yield hi
@@ -26,7 +30,7 @@ def encode_rgb(iterable: Iterable[int], palette: Sequence[int]) \
         raise StopIteration
 
 
-def decode_2bit(iterable: Iterable[int], palette: Sequence[int]) \
+def decode_2bit(iterable: Iterable[int], palette: Sequence[Color]) \
         -> Iterable[int]:
     """For every two bytes consumed from the given iterable, generates 8 decoded
     RGB8 colors based on the palette.
@@ -36,14 +40,18 @@ def decode_2bit(iterable: Iterable[int], palette: Sequence[int]) \
     :returns: An iterable of decoded data.
     """
     iterable = iter(iterable)
+    #print(palette)
     try:
         while True:
             hi = next(iterable)
             lo = next(iterable)
+            #print(hi, lo)
             for i in range(8):
                 c = (lo >> (7-i)) & 1
                 c |= ((hi >> (7-i)) & 1) << 1
+                #print(hex(c))
                 color = palette[c]
+                #print(hex(color))
                 yield color
     except StopIteration:
         raise StopIteration()
@@ -82,11 +90,16 @@ class RGBTileset():
         for i, et in enumerate(encoded_tiles):
             tx = (i % width_tiles) * twidth
             ty = (i // width_tiles) * theight
+            #print(et)
             decoded_tile = bytes(decode_2bit(et, palette))
             for y in range(theight):
                 row = decoded_tile[y*twidth:(y+1)*twidth]
                 decoded_data[(ty+y)*width+tx:(ty+y)*width+tx+twidth] = row
+        #print(decoded_data)
         return RGBTileset(decoded_data, gbtileset.size, gbtileset.tile_size)
+
+    def to_gb(self, palette: Sequence[int]) -> 'GBTileset':
+        return GBTileset.from_rgb(self, palette)
 
     def split_tiles(self) -> Sequence[Sequence[int]]:
         """In the encoded data, tiles are stored contiguously; decoded, they're
@@ -101,12 +114,14 @@ class RGBTileset():
         height_tiles = height // theight
         for i in range(width_tiles*height_tiles):
             # TODO use bytearray
-            tile = [] # List[int]
+            #tile = [] # List[int]
+            tile = bytearray(twidth*theight)
             tx = (i % width_tiles) * twidth
             ty = (i // width_tiles) * theight
             for y in range(ty, ty+theight):
                 row = self.data[y*width+tx:y*width+tx+twidth]
-                tile.extend(row)
+                tile[twidth*(y-ty):twidth*(y-ty)+twidth] = row
+                #tile.extend(row)
             tiles.append(tile)
         return tiles
 
@@ -152,6 +167,8 @@ class GBTileset():
                     bytes(encode_rgb(dt, palette))
         return GBTileset(encoded_data, rgbtileset.size, rgbtileset.tile_size)
 
+    def to_rgb(self, palette: Sequence[int]) -> RGBTileset:
+        return RGBTileset.from_gb(self, palette)
 
 if __name__ == '__main__':
     from PIL import Image
