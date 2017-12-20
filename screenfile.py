@@ -4,8 +4,8 @@ One-off script for building an input file to displayscreen.py."""
 
 import argparse
 from PIL import Image
-from image2tilemap import imageto2bit
-from gfx import RGBTileset, GBTileset
+#from image2tilemap import imageto2bit
+from gfx import RGBTileset
 import json
 import sys
 
@@ -69,7 +69,10 @@ SPRITE_TABLE = [
         0, 0, 0, 0,
         ]
 img = Image.open(args.tile_image).convert(mode='L')
-tiles = imageto2bit(img, (8, 8))
+tileset = RGBTileset(img.tobytes(), img.size, (8, 8))
+#tiles = imageto2bit(img, (8, 8))
+palette = [0xff, 0xc0, 0x40, 0x00]
+tiles = tileset.to_gb(palette).data
 tiled_json = json.loads(args.tilemap.read())
 sub1 = lambda x: x - 1 if x > 0 else 0
 bgmap = bytes(map(sub1, tiled_json['layers'][0]['data']))
