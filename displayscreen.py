@@ -1,51 +1,93 @@
 """displayscreen.py
 
-This script takes a file with a special binary format.
-
-0x0000-0x0fff: 8x8x2 tile data (256 tiles at 16 B/tile)
-0x1000-0x13ff: 32x32 byte background tile map (1 B/tile)
-0x1400-0x17ff: 32x32 byte window tile map
-0x1800-0x189f: 40 sprite table entries (4 B each)
+Takes a tileset image and a tilemap from Tiled and draws it like a GameBoy
+screen—160x144.
 """
 
 
 import argparse
 from collections import defaultdict
+from typing import Tuple
 import functools as ft
 import itertools as it
 from math import sqrt
+from PIL import Image
 import sdl2.ext
 from sdl2.ext import Color
 import sdl2.events
+from sdl2 import (SDL_CreateRGBSurfaceWithFormatFrom,
+                  SDL_CreateTextureFromSurface,
+                  SDL_FreeSurface,
+                  SDL_Texture,
+                  SDL_CreateRGBSurfaceWithFormat,
+                  SDL_BlitSurface,
+                  SDL_ConvertSurfaceFormat,
+                 )
+import sdl2
+import json
 
-from display2bit import i2bitdecode, split_tiles
+from gfx import GBTileset, RGBTileset
 
 bgpalette = [
-    Color(0, 0, 0, 255),
-    Color(64, 64, 64, 255),
-    Color(192, 192, 192, 255),
-    Color(255, 255, 255, 255),
+    0x00,
+    0x40,
+    0xc0,
+    0xff,
 ]
+#bgpalette = [
+#    Color(0, 0, 0, 255),
+#    Color(64, 64, 64, 255),
+#    Color(192, 192, 192, 255),
+#    Color(255, 255, 255, 255),
+#]
+#bgpalette = [
+#    0x000000ff,
+#    0x404040ff,
+#    0xc0c0c0ff,
+#    0xffffffff,
+#]
+
 fgpalette = [
-    Color(0, 0, 0, 0),
-    Color(64, 64, 64, 255),
-    Color(192, 192, 192, 255),
-    Color(255, 255, 255, 255),
+    0x00,
+    0x40,
+    0xc0,
+    0xff,
 ]
-#SCREEN_WIDTH = 160
-#SCREEN_HEIGHT = 144
-SCREEN_WIDTH = 256
-SCREEN_HEIGHT = 256
+#fgpalette = [
+#    Color(0, 0, 0, 0),
+#    Color(64, 64, 64, 255),
+#    Color(192, 192, 192, 255),
+#    Color(255, 255, 255, 255),
+#]
+
+
+
+SCREEN_WIDTH = 160
+SCREEN_HEIGHT = 144
+#SCREEN_WIDTH = 256
+#SCREEN_HEIGHT = 256
 BACKGROUND_WIDTH = 256
 BACKGROUND_HEIGHT = 256
-#WINDOW_WIDTH = 160
-#WINDOW_HEIGHT = 144
-WINDOW_WIDTH = 256
-WINDOW_HEIGHT = 256
+WINDOW_WIDTH = 160
+WINDOW_HEIGHT = 144
 SPRITE_WIDTH = 8
 SPRITE_HEIGHT = 8
 #SPRITE_HEIGHT = 16
 
+
+#bgpalette = [
+#    Color(0xff, 0xff, 0xff, 0xff),
+#    Color(0x55, 0x55, 0x55, 0xff),
+#    Color(0xaa, 0xaa, 0xaa, 0xff),
+#    Color(0x00, 0x00, 0x00, 0xff),
+#]
+#
+#fgpalette = [
+#    Color(0xff, 0xff, 0xff, 0x00),
+#    Color(0x55, 0x55, 0x55, 0xff),
+#    Color(0xaa, 0xaa, 0xaa, 0xff),
+#    Color(0x00, 0x00, 0x00, 0xff),
+#]
 
 def test_i2bitdecode():
     encoded = [
@@ -68,11 +110,13 @@ def test_i2bitdecode():
     assert decoded == decoded_expected
 
 
-test_i2bitdecode()
+#test_i2bitdecode()
 
 parser = argparse.ArgumentParser(description='Display a static GB screen')
-parser.add_argument('screenfile', type=argparse.FileType('rb'),
-                    help='Binary file format described in the script.')
+parser.add_argument('tileset', type=str,
+                    help='Tileset image (expecting 256x256).')
+parser.add_argument('tilemap', type=argparse.FileType('r'),
+                    help='Tiled JSON with the BG and FG maps (layers 0, 1).')
 parser.add_argument('--scx', type=int,
                     help='Background scroll x.')
 parser.add_argument('--scy', type=int,
@@ -81,80 +125,201 @@ parser.add_argument('--wcx', type=int,
                     help='Window x position')
 parser.add_argument('--wcy', type=int,
                     help='Window y position')
-
 args = parser.parse_args()
 
-tile_data = args.screenfile.read(0x4000)
-bg_tmap = args.screenfile.read(0x400)
-fg_tmap = args.screenfile.read(0x400)
-sprite_table = args.screenfile.read(0xa0)
+tileset = Image.open(args.tileset).convert('L')
+rgbtileset = RGBTileset(tileset.tobytes(), tileset.size, (8, 8))
+#encode_palette = [0xff, 0x55, 0xaa, 0x00]
+gbtileset = GBTileset.from_rgb(rgbtileset, bgpalette)
+
+tile_data = gbtileset.data
+tiled_json = json.loads(args.tilemap.read())
+sub1 = lambda x: x - 1 if x > 0 else 0
+bgmap = bytes(map(sub1, tiled_json['layers'][0]['data']))
+fgmap = bytes(tiled_json['layers'][1]['data'])
+sprite_table = [
+    32, 32, 9, 0, # y=48,x=40,tileid=9,flags=0
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+]
 
 assert len(tile_data) == 32*32*16
-assert len(bg_tmap) == 32*32
-assert len(fg_tmap) == 32*32
+assert len(bgmap) == 32*32
+#assert len(fg_tmap) == 32*32
 assert len(sprite_table) == 40*4
 
-window = sdl2.ext.Window('GB screen', (BACKGROUND_WIDTH, BACKGROUND_HEIGHT))
-window.show()
-renderer = sdl2.ext.Renderer(window)
-width = SCREEN_WIDTH
-height = SCREEN_HEIGHT
+width = BACKGROUND_WIDTH
+height = BACKGROUND_HEIGHT
 tile_width = 8
 tile_height = 8
 tile_size = tile_width, tile_height
 width_tiles = width // tile_width
 height_tiles = height // tile_height
-bgwidth_tiles = BACKGROUND_WIDTH // tile_width
-bgheight_tiles = BACKGROUND_HEIGHT // tile_height
+
+tileset = GBTileset(tile_data, (256, 256), tile_size)
+bgtiles = list(tileset.to_rgb(bgpalette).split_tiles())
+fgtiles = list(tileset.to_rgb(fgpalette).split_tiles())
+
+class RenderError(Exception):
+    def __init__(self, message):
+        self.message = message
+
+def get_tile_surfaces(tiles):
+    rgb_tile = bytearray(tile_width*tile_height*3)
+    for tile in tiles:
+        for i in range(len(tile)):
+            rgb_tile[3*i] = tile[i]
+            rgb_tile[3*i+1] = tile[i]
+            rgb_tile[3*i+2] = tile[i]
+
+        surf = SDL_CreateRGBSurfaceWithFormatFrom(bytes(rgb_tile), tile_width,
+                                                  tile_height, 24, 3*tile_width,
+                                                  sdl2.SDL_PIXELFORMAT_RGB24)
+        if not surf:
+            raise RenderError('SDL_CreateRGBSurfaceWithFormatFrom returned null')
+        else:
+            yield SDL_ConvertSurfaceFormat(surf, sdl2.SDL_PIXELFORMAT_RGBA32, 0)
+            SDL_FreeSurface(surf)
+
+def get_tile_textures(renderer, tiles):
+    for surf in get_tile_surfaces(tiles):
+        text = SDL_CreateTextureFromSurface(renderer, surf)
+        SDL_FreeSurface(surf)
+        if not text:
+            raise RenderError('SDL_CreateTextureFromSurface returned null')
+        else:
+            yield text.contents
+
+def bg_tile_visible(tileid: int, sc: Tuple[int, int]) -> bool:
+    tx = (tileid % width_tiles) * tile_width
+    ty = (tileid // width_tiles) * tile_height
+    scx, scy = sc
+    if tx + tile_width < scx:
+        return False
+    elif tx > SCREEN_WIDTH + scx:
+        return False
+    elif ty + tile_height < scy:
+        return False
+    elif ty > SCREEN_HEIGHT + scy:
+        return False
+    else:
+        return True
 
 
-bgtiles = split_tiles(tile_data, (256, 256), (tile_size))
+def draw_tile(renderer, texture: SDL_Texture, pos: Tuple[int, int]) -> None:
+    x, y = pos
+    src = (0, 0, tile_width, tile_height)
+    dest = (x, y, tile_width, tile_height)
+    renderer.copy(texture, src, dest)
 
+from ctypes import byref
 
-def draw_tile(renderer, tile, point):
-    x, y = point
-    for i, c in enumerate(tile):
-        xoff = i % tile_width
-        yoff = i // tile_width
-        point = (x+xoff, y+yoff)
-        renderer.draw_point(point, c)
+bgsurfaces = list(get_tile_surfaces(bgtiles))
+def draw_screen(renderer, sc: Tuple[int, int]):
+    # draw background
+    bgsurface = SDL_CreateRGBSurfaceWithFormat(0, BACKGROUND_HEIGHT, BACKGROUND_HEIGHT,
+                                     32, sdl2.SDL_PIXELFORMAT_RGBA32)
+    for i, tid in enumerate(bgmap):
+        x = (i % width_tiles) * tile_width
+        y = (i // width_tiles) * tile_height
+        src = sdl2.SDL_Rect(0, 0, tile_width, tile_height)
+        dst = sdl2.SDL_Rect(x, y, tile_width, tile_height)
+        if SDL_BlitSurface(bgsurfaces[tid], src, bgsurface, dst) < 0:
+            raise sdl2.SDL_Error()
+    bgtexture = SDL_CreateTextureFromSurface(renderer.sdlrenderer, bgsurface)
+    SDL_FreeSurface(bgsurface)
+    if not bgtexture:
+        raise sdl2.SDL_Error()
+    scx, scy = sc
+    src = (scx, scy, SCREEN_WIDTH, SCREEN_HEIGHT)
+    dst = (0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
+    renderer.copy(bgtexture.contents, src, dst)
 
-bgwidth_tiles = BACKGROUND_WIDTH // tile_width
-bgheight_tiles = BACKGROUND_HEIGHT // tile_height
-for i, tid in enumerate(bg_tmap):
-    x = (i % bgwidth_tiles) * tile_width
-    y = (i // bgwidth_tiles) * tile_height
-    draw_tile(renderer, bgtiles[tid], (x, y))
+    # foreground
+    #fgwidth_tiles = WINDOW_WIDTH // tile_width
+    #fgheight_tiles = WINDOW_HEIGHT // tile_height
+    #fgtextures = list(get_tile_textures(renderer.sdlrenderer, fgtiles))
+    #for i, tid in enumerate(fgmap):
+    #    if tid > 0:
+    #        x = (i % width_tiles) * tile_width
+    #        y = (i // width_tiles) * tile_height
+    #        draw_tile(renderer, fgtextures[tid-1], (x, y))
 
-# draw background
-#for i, tid in enumerate(bg_tmap):
-#    x = (i*8) % width
-#    y = (i*8) // width
-#    draw_tile(renderer, bgtiles[tid], (x, y))
+    ## sprites
+    #for i in range(40):
+    #    sy = sprite_table[i*4] - 16
+    #    sx = sprite_table[i*4+1] - 8
+    #    tileid = sprite_table[i*4+2]
+    #    flags = sprite_table[i*4+3]
+    #    draw_tile(renderer, bgtiles[tileid], (sx, sy))
 
-# foreground
-#for i, tid in enumerate(fg_tmap):
-#    x = (i*8) % width
-#    y = (i*8) // width
-#    draw_tile(renderer, fgtiles[tid], (x, y))
+    renderer.present()
 
-# sprites
-#for i in range(40):
-#    sy = sprite_table[i*4] - 16
-#    sx = sprite_table[i*4+1] - 8
-#    tileid = sprite_table[i*4+2]
-#    flags = sprite_table[i*4+3]
-#    draw_tile(renderer, bgtiles[tileid], (sx, sy))
-
-
-renderer.present()
+window = sdl2.ext.Window('GB screen', (SCREEN_WIDTH, SCREEN_HEIGHT))
+window.show()
+renderer = sdl2.ext.Renderer(window)
 
 running = True
+scx = 0
+scy = 0
+draw_screen(renderer, (scx, scy))
 while running:
     events = sdl2.ext.get_events()
     for event in events:
         if event.type == sdl2.events.SDL_QUIT:
             running = False
             break
+        if event.type == sdl2.SDL_KEYDOWN:
+            if event.key.keysym.sym == sdl2.SDLK_DOWN:
+                scy += 1
+                scy = min(BACKGROUND_HEIGHT-SCREEN_HEIGHT, scy)
+            elif event.key.keysym.sym == sdl2.SDLK_UP:
+                scy -= 1
+                scy = max(0, scy)
+            elif event.key.keysym.sym == sdl2.SDLK_RIGHT:
+                scx += 1
+                scx = min(BACKGROUND_WIDTH-SCREEN_WIDTH, scx)
+            elif event.key.keysym.sym == sdl2.SDLK_LEFT:
+                scx -= 1
+                scx = max(0, scx)
+            draw_screen(renderer, (scx, scy))
+
     sdl2.SDL_Delay(100)
 

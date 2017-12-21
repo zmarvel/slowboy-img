@@ -3,65 +3,60 @@ import sys
 import sdl2.ext
 from sdl2.ext import Color
 import sdl2.events
+from gfx import RGBTileset, GBTileset
+
 
 palette = [
-        Color(255, 255, 255, 255),
-        Color(192, 192, 192, 255),
-        Color(64, 64, 64, 255),
-        Color(0, 0, 0, 255),
+        Color(0x00, 0x00, 0x00, 0xff),
+        Color(0x55, 0x55, 0x55, 0xff),
+        Color(0xaa, 0xaa, 0xaa, 0xff),
+        Color(0xff, 0xff, 0xff, 0xff),
         ]
 
-
-def i2bitdecode(iterator, palette):
-    iterator = iter(iterator)
-    try:
-        while True:
-            hi = next(iterator)
-            lo = next(iterator)
-            for i in range(8):
-                c = (lo >> (7-i)) & 1
-                c |= ((hi >> (7-i)) & 1) << 1
-                color = palette[c]
-                yield color
-    except StopIteration:
-        raise StopIteration()
+decode_palette = [
+    0x00,
+    0x55,
+    0xaa,
+    0xff,
+]
 
 
-def split_tiles(tileset, size, tile_size):
+if __name__ == '__main__':
+    import argparse as ap
+
+    parser = ap.ArgumentParser('Decode and display a 2-bit image with SDL2.')
+    parser.add_argument('image', type=ap.FileType('rb'),
+                        help='Image to show.')
+    parser.add_argument('--width', type=int, default=256,
+                        help='Image width (default=256).')
+    parser.add_argument('--height', type=int, default=256,
+                        help='Image height (default=256).')
+    parser.add_argument('--tile-width', type=int, default=8,
+                        help='Tile width (default=8).')
+    parser.add_argument('--tile-height', type=int, default=8,
+                        help='Tile height (default=8).')
+    args = parser.parse_args()
+
+    tset = args.image.read()
+
+    size = (args.width, args.height)
     width, height = size
-    twidth, theight = tile_size
-    tile_size_bytes = 16
-    tiles = []
+    tsize = (args.tile_width, args.tile_height)
+    twidth, theight = tsize
+    gbtileset = GBTileset(tset, size, tsize)
+    rgbtileset = RGBTileset.from_gb(gbtileset, decode_palette)
     width_tiles = width // twidth
     height_tiles = height // theight
-    for i in range(width_tiles*height_tiles):
-        tile = tileset[i*tile_size_bytes:(i+1)*tile_size_bytes]
-        tiles.append(list(i2bitdecode(tile, palette)))
-    return tiles
 
-
-def main():
-    if len(sys.argv) < 2:
-        sys.exit('USAGE: {} <tilemap>')
-
-    with open(sys.argv[1], 'rb') as f:
-        tmap = f.read()
-
-    twidth = 8
-    theight = 8
-    tiles = split_tiles(tmap, (255, 255), (8, 8))
-
-    window = sdl2.ext.Window('display2bit', (width, height))
+    window = sdl2.ext.Window('display2bit', size)
     window.show()
     renderer = sdl2.ext.Renderer(window)
 
-    for tid, tile in enumerate(tiles):
-        tx = tid % width_tiles
-        ty = tid // width_tiles
-        for i, c in enumerate(tile):
-            x = tx*8 + (i % 8)
-            y = ty*8 + (i // 8)
-            renderer.draw_point((x, y), color=c)
+    for i, b in enumerate(rgbtileset.data):
+        x = i % width
+        y = i // width
+        c = palette[decode_palette.index(b)]
+        renderer.draw_point((x, y), color=c)
 
     renderer.present()
 
@@ -75,5 +70,3 @@ def main():
         sdl2.SDL_Delay(100)
 
 
-if __name__ == '__main__':
-    main()

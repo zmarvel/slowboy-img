@@ -11,7 +11,7 @@ import sys
 
 parser = argparse.ArgumentParser(description='One-off script for building an input file to displayscreen.py')
 parser.add_argument('tile_image', type=str,
-        help='256x256 image containing 8x8 tiles')
+        help='256x256 tileset image containing 8x8 tiles')
 parser.add_argument('tilemap', type=argparse.FileType('r'),
         help='Tiled JSON containing the BG and FG maps (layers 0 and 1)')
 parser.add_argument('outfile', type=argparse.FileType('wb'),

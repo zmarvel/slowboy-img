@@ -2,7 +2,6 @@
 
 from PIL import Image
 
-
 def rgb_i2bit(iterable):
     """Consumes an iterable of byte values and generates pairs of bytes
     representing 8 pixels.
@@ -69,10 +68,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
     try:
         img = Image.open(args.in_file).convert('L')
-        rgb2_bytes = bytes(imageto2bit(img, (8, 8)))
     except IOError:
         parser.print_help()
         sys.exit()
+
+    tileset = Tileset(img.tobytes(), img.size, (8, 8), encoded=False)
+    rgb2_bytes = bytes(imageto2bit(img, (8, 8)))
 
     if args.asm:
         with open(args.out_file, 'w') as f:
