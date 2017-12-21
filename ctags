@@ -1,0 +1,4 @@
+#!/bin/bash
+
+ctags *
+ctags --append -R ./env/lib
