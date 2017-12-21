@@ -2,7 +2,6 @@
 
 from PIL import Image
 
-
 def rgb_i2bit(iterable):
     """Consumes an iterable of byte values and generates pairs of bytes
     representing 8 pixels.

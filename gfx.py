@@ -18,12 +18,8 @@ def encode_rgb(iterable: Iterable[int], palette: Sequence[int]) \
             hi = 0
             lo = 0
             for i in range(8):
-                c = (next(iterable) >> 6)
-                # c = palette.index(next(iterable))
-                # c = (next(iterable) >> 6) ^ 0x3
-                #b = next(iterable)
-                #print(hex(b))
-                #c = palette.index(b)
+                b = next(iterable)
+                c = palette.index(b)
                 hi |= (c >> 1) << (7 - i)
                 lo |= (c & 1) << (7 - i)
             yield hi
@@ -47,13 +43,10 @@ def decode_2bit(iterable: Iterable[int], palette: Sequence[Color]) \
         while True:
             hi = next(iterable)
             lo = next(iterable)
-            #print(hi, lo)
             for i in range(8):
                 c = (lo >> (7-i)) & 1
                 c |= ((hi >> (7-i)) & 1) << 1
-                #print(hex(c))
                 color = palette[c]
-                #print(hex(color))
                 yield color
     except StopIteration:
         raise StopIteration()
@@ -92,12 +85,10 @@ class RGBTileset():
         for i, et in enumerate(encoded_tiles):
             tx = (i % width_tiles) * twidth
             ty = (i // width_tiles) * theight
-            #print(et)
             decoded_tile = bytes(decode_2bit(et, palette))
             for y in range(theight):
                 row = decoded_tile[y*twidth:(y+1)*twidth]
                 decoded_data[(ty+y)*width+tx:(ty+y)*width+tx+twidth] = row
-        #print(decoded_data)
         return RGBTileset(decoded_data, gbtileset.size, gbtileset.tile_size)
 
     def to_gb(self, palette: Sequence[int]) -> 'GBTileset':
@@ -109,23 +100,18 @@ class RGBTileset():
 
         :returns: A list of tiles.
         """
-        tiles = [] # List[List[int]]
         width, height = self.size
         twidth, theight = self.tile_size
         width_tiles = width // twidth
         height_tiles = height // theight
         for i in range(width_tiles*height_tiles):
-            # TODO use bytearray
-            #tile = [] # List[int]
             tile = bytearray(twidth*theight)
             tx = (i % width_tiles) * twidth
             ty = (i // width_tiles) * theight
             for y in range(ty, ty+theight):
                 row = self.data[y*width+tx:y*width+tx+twidth]
                 tile[twidth*(y-ty):twidth*(y-ty)+twidth] = row
-                #tile.extend(row)
-            tiles.append(tile)
-        return tiles
+            yield tile
 
 
 class GBTileset():
